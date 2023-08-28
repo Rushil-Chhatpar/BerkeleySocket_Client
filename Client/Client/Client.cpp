@@ -9,6 +9,12 @@ using namespace std;
 
 void CleanupWSADLL();
 
+DWORD WINAPI ReceivingThread(LPVOID param);
+DWORD WINAPI SendingThread(LPVOID param);
+
+SOCKET clientSocket;
+bool ProcessOver = false;
+
 int main()
 {
     cout << "\n\nTHIS IS A CLIENT!!!\n\n\n";
@@ -17,7 +23,6 @@ int main()
     // Step 1. Set up WSA DLL
     //
 
-    SOCKET clientSocket;
     int port = 55555;
     WSADATA wsaData;
     int wsaError;
@@ -79,74 +84,60 @@ int main()
     // Send and receive data
     //
 
-    char buffer[200];
-    int byteCount;
-    enum STATUS
-    {
-        SENDING = 0,
-        RECEIVING = 1,
-    };
 
-    STATUS status = SENDING;
+    DWORD threadID;
+    HANDLE threadHDL[2];
+    threadHDL[0] = CreateThread(NULL, 0, ReceivingThread, NULL, 0, &threadID);
+    SetThreadPriority(threadHDL[0], THREAD_PRIORITY_NORMAL);
+    threadHDL[1] = CreateThread(NULL, 0, SendingThread, NULL, 0, &threadID);
+    SetThreadPriority(threadHDL[1], THREAD_PRIORITY_ABOVE_NORMAL);
 
-    while (strcmp(buffer, "SHUTDOWN") != 0)
+
+    //char buffer[200];
+    //int byteCount;
+    //enum STATUS
+    //{
+    //    SENDING = 0,
+    //    RECEIVING = 1,
+    //};
+
+    //STATUS status = SENDING;
+
+    //while (strcmp(buffer, "SHUTDOWN") != 0)
+    //{
+    //    if (status == SENDING)
+    //    {
+    //        cout << "\nClient: ";
+    //        cin.getline(buffer, 200);
+    //        byteCount = send(clientSocket, buffer, 200, 0);
+    //        if (byteCount > 0)
+    //        {
+    //            //cout << "\nMessage sent.\n\n";
+    //            status = RECEIVING;
+    //        }
+    //        else
+    //            cout << "\nMessage failed to send.\n\n";
+    //    }
+    //    else if (status == RECEIVING)
+    //    {
+    //        byteCount = recv(clientSocket, buffer, 200, 0);
+    //        if (byteCount > 0)
+    //        {
+    //            
+    //            cout << "\nServer: " << buffer << "\n";
+    //            status = SENDING;
+    //        }
+    //    }
+    //}
+
+
+
+    if (ProcessOver == true)
     {
-        if (status == SENDING)
-        {
-            cout << "\nClient: ";
-            cin.getline(buffer, 200);
-            byteCount = send(clientSocket, buffer, 200, 0);
-            if (byteCount > 0)
-            {
-                //cout << "\nMessage sent.\n\n";
-                status = RECEIVING;
-            }
-            else
-                cout << "\nMessage failed to send.\n\n";
-        }
-        else if (status == RECEIVING)
-        {
-            byteCount = recv(clientSocket, buffer, 200, 0);
-            if (byteCount > 0)
-            {
-                
-                cout << "\nServer: " << buffer << "\n";
-                status = SENDING;
-            }
-        }
+        system("pause");
+        CleanupWSADLL();
+        return 0;
     }
-
-    //cout << "Please enter a message to send:\n";
-    //cin.getline(buffer, 200);
-
-
-    //byteCount = send(clientSocket, buffer, 200, 0);
-
-    //if (byteCount > 0)
-    //{
-    //    cout << "\nMessage sent.\n";
-    //}
-    //else
-    //{
-    //    CleanupWSADLL();
-    //    return 0;
-    //}
-
-    //byteCount = recv(clientSocket, buffer, 200, 0);
-    //if (byteCount > 0)
-    //{
-    //    cout << "Message received: " << buffer << "\n";
-    //}
-    //else
-    //{
-    //    CleanupWSADLL();
-    //    return 0;
-    //}
-
-
-    system("pause");
-    CleanupWSADLL();
-    return 0;
 }
 
 
@@ -156,4 +147,38 @@ void CleanupWSADLL()
     // Shut down WSA DLL
     int cleanupError = WSACleanup();
     cout << "\n\n\n\n\n\nCleanup result: " << cleanupError << "\n\n";
+}
+
+DWORD __stdcall ReceivingThread(LPVOID param)
+{
+    char buffer[200];
+    int byteCount;
+    while (strcmp(buffer, "SHUTDOWN") != 0)
+    {
+        byteCount = recv(clientSocket, buffer, 200, 0);
+        if (byteCount > 0)
+            cout << "\nServer: " << buffer << "\n";
+    }
+    if (strcmp(buffer, "SHUTDOWN") == 0)
+        ProcessOver = true;
+    return 0;
+}
+
+DWORD __stdcall SendingThread(LPVOID param)
+{
+    char buffer[200];
+    int byteCount;
+    while (strcmp(buffer, "SHUTDOWN") != 0)
+    {
+        cout << "\nEnter your message: ";
+        cin.getline(buffer, 200);
+        byteCount = send(clientSocket, buffer, 200, 0);
+        if (byteCount < 0)
+        {
+            cout << "\nMessage failed to send!\n";
+        }
+    }
+    if (strcmp(buffer, "SHUTDOWN") == 0)
+        ProcessOver = true;
+    return 0;
 }
